@@ -24,8 +24,13 @@ const unsigned int greenLedPin = 7;
 ScheduledAction statusLedAction;
 bool statusLedState = false;
 
-uint8_t rwRegister = 0;
-uint8_t ledMask = 0;
+volatile uint8_t rwRegister = 0;
+volatile uint8_t ledMask = 0;
+volatile uint8_t buttonMask = 0;
+
+#ifndef cbi
+#define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
+#endif
 
 #define DEFAULT_LED_MASK 0x07
 
@@ -72,18 +77,10 @@ void updateBufferWithLedStatus(uint8_t *buffer, uint8_t& bufferLength) {
 }
 
 void updateBufferWithButtonState(uint8_t *buffer, uint8_t& bufferLength) {
-  uint8_t output;
-
-  output = output | (backButton.getValue() << 3);
-  output = output | (upButton.getValue() << 2);
-  output = output | (downButton.getValue() << 1);
-  output = output | (selectButton.getValue() << 0);
-
-  buffer[0] = output;
+  buffer[0] = buttonMask;
   bufferLength = 1;
 }
 
-// callback for received data
 void receiveData(int byteCount) {
 
   int availableCount = Wire.available();
@@ -104,7 +101,7 @@ void receiveData(int byteCount) {
 }
 
 void flushReceiveBuffer(void) {
-  while (Wire.available()>0) {
+  while (Wire.available() > 0) {
     Wire.read();
   }
 }
@@ -124,9 +121,6 @@ void getIncomingDataAndUpdateLeds(void) {
 void setLeds(uint8_t newLedMask) {
 
   ledMask = newLedMask;
-
-  Serial.print("Updating LEDs, ledMask: ");
-  Serial.println(ledMask, BIN);
 
   if (ledMask & (1 << 2)) {
     redLedOutput.enable();
@@ -173,6 +167,18 @@ void setup() {
   // initialize i2c as slave
   Wire.begin(SLAVE_ADDRESS);
 
+#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega8__) || defined(__AVR_ATmega328P__)
+   // deactivate internal pull-ups for twi
+   // as per note from atmega8 manual pg167
+   cbi(PORTC, 4);
+   cbi(PORTC, 5);
+ #else
+   // deactivate internal pull-ups for twi
+   // as per note from atmega128 manual pg204
+   cbi(PORTD, 0);
+   cbi(PORTD, 1);
+ #endif
+
   statusLedAction.setDelayMillis(500L);
   statusLedAction.reset();
 
@@ -193,12 +199,20 @@ void loop() {
     }
   }
 
-  debouceSwitches();
+  readButtons();
 }
 
-void debounceSwitches(void) {
-  backButton.getValue();
-  upButton.getValue();
-  downButton.getValue();
-  selectButton.getValue();
+void updateButtonMask(DebouncedInput &input, uint8_t bit) {
+  if (input.getValue()) {
+    buttonMask |= (1 << bit);
+  } else {
+    buttonMask &= (uint8_t)~(1 << bit);
+  }
+}
+
+void readButtons(void) {
+  updateButtonMask(backButton, 3);
+  updateButtonMask(upButton, 2);
+  updateButtonMask(downButton, 1);
+  updateButtonMask(selectButton, 0);
 }
