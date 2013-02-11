@@ -1,0 +1,55 @@
+I2C Slave example
+
+About
+
+This example allows you to hook up LEDs and Switches to an Arduino and control
+it over an i2c bus.  It uses an address register just like normal i2c devices
+do and also because most i2c code expects an i2c device to use registers for
+reading and writing.  e.g.  linux i2cget/i2cset/i2cdump and the linux i2c
+library.
+
+
+Details
+
+The i2c slave has 4 registers, 3 for reading, one for writing.
+
+Registers
+
+0x00, REG_READ_STATUS
+0x01, REG_READ_LEDS
+0x02, REG_READ_BUTTONS
+0x03, REG_WRITE_LEDS
+
+
+Usage
+
+From linux.  See i2cget/i2cset/i2cdump man pages for more details.
+
+Read status:
+
+sudo i2cget -y 1 0x21 0x00 c
+
+Read leds:
+
+sudo i2cget -y 1 0x21 0x01 c
+
+Read switches:
+
+sudo i2cget -y 1 0x21 0x02 c
+
+Set leds on:
+
+sudo i2cset -y 1 0x21 0x03 0x07 b
+
+Set leds off:
+
+sudo i2cset -y 1 0x21 0x03 0x00 b
+
+
+Copyright
+
+The code is copyright Dominic Clifton.
+
+License
+
+GPL v3
